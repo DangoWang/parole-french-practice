@@ -6,11 +6,12 @@ const KEY='parole.study.v2',LEGACY_KEY='parole.study.v1', $=id=>document.getElem
 
 let state=Sets.initial(seed,C),current=null,revealed=false,chosen=null,mode='daily',scope='all',view='practice',extra=false,manual=false,libraryPage=0,toastTimer,storageBlocked=false;
 
+let voice,speaking,cloud;
 const AI=window.ParoleAI;
 let aiConfig={key:'',enabled:false},aiResult=null,aiError='',aiBusy=false,aiController=null,aiGeneration=0,scoreTouched=false,testController=null;
 try{aiConfig=AI.loadConfig(localStorage);}catch{}
 function cancelAI(){aiGeneration++;aiController?.abort();aiController=null;aiBusy=false;}
-function resetAI(){cancelAI();aiResult=null;aiError='';scoreTouched=false;}
+function resetAI(){speaking?.reset();voice?.reset();cancelAI();aiResult=null;aiError='';scoreTouched=false;}
 function refreshAISettings(message){
  $('ai-key').value='';$('ai-enabled').checked=aiConfig.enabled;
  $('ai-settings-status').textContent=message||(aiConfig.key?'已保存密钥 · '+(aiConfig.enabled?'自动评分已开启':'自动评分已关闭'):'尚未设置密钥，仍可使用匹配建议和自评分。');
@@ -54,10 +55,13 @@ function setupAISettings(){
  refreshAISettings();
 }
 setupAISettings();
+speaking=window.ParoleSpeaking.mount({getKey:()=>aiConfig.key,getCard:()=>current});
+voice=window.ParoleVoice.mount({onStart:()=>speaking.reset(),onRecording:blob=>speaking.capture(blob),getKey:()=>aiConfig.key,canRecord:()=>!!current&&!revealed&&view==='practice',onText:text=>{const input=$('answer');const combined=[input.value.trim(),text].filter(Boolean).join(' ');if(combined.length>input.maxLength){toast('转写后内容超过 2000 字符，请精简输入后重新录音。');return;}input.value=combined;input.dispatchEvent(new Event('input'));input.focus();}});
+window.addEventListener('pagehide',()=>{voice.reset();speaking.reset();});
 
 function warning(message){$('storage-warning').hidden=false;$('storage-warning').textContent=message;}
 try{const raw=localStorage.getItem(KEY)||localStorage.getItem(LEGACY_KEY);if(raw)state=Sets.validate(JSON.parse(raw),seed,C);}catch(e){storageBlocked=true;warning('暂时无法读取学习记录，原数据不会被覆盖。你仍可练习并导出本次备份；请检查浏览器存储设置，或导入有效备份。');}
-function persist(){if(storageBlocked)return false;try{localStorage.setItem(KEY,JSON.stringify(state));return true;}catch{warning('浏览器未能保存进度。本次页面中的记录仍在，请在「学习设置与备份」中导出备份。');return false;}}
+function persist(){if(storageBlocked)return false;try{localStorage.setItem(KEY,JSON.stringify(state));cloud?.changed();return true;}catch{warning('浏览器未能保存进度。本次页面中的记录仍在，请在「学习设置与备份」中导出备份。');return false;}}
 function toast(message){clearTimeout(toastTimer);$('toast').textContent=message;$('toast').hidden=false;toastTimer=setTimeout(()=>$('toast').hidden=true,4200);}
 function when(timestamp){if(timestamp<=Date.now())return '现在到期';const minutes=Math.ceil((timestamp-Date.now())/60000);if(minutes<=60)return `${minutes} 分钟后`;if(C.dayKey(timestamp)===C.dayKey(C.dayAfter(1)))return '明天';return new Intl.DateTimeFormat('zh-CN',{month:'short',day:'numeric'}).format(timestamp);}
 function nextCopy(p){return p.stage==='learning'&&p.interval===0?'10 分钟后复习':`${when(p.due)}复习${p.interval>1?` · 间隔 ${p.interval} 天`:''}`;}
@@ -104,7 +108,7 @@ else{title=mode==='due'?'当前到期复习已完成':'这一组暂时没有新�
 if(!deck.length){title='先选择要练习的句集';body='在表达库中勾选一个或多个句集，并添加表达。未选中的句集会暂停出题和复习。';button='<button class="primary" id="browse-library">选择句集 →</button>';}
 $('empty-state').innerHTML='<div class="empty-icon">✓</div><h2>'+title+'</h2><p>'+body+'</p>'+button;$('continue-extra')?.addEventListener('click',()=>{extra=true;chooseNext();});$('switch-daily')?.addEventListener('click',()=>setMode('daily'));$('browse-library')?.addEventListener('click',()=>showView('library'));}
 function chooseNext(){manual=false;const card=nextCard();if(card)showCard(card);else empty();updateStats();}
-function revealAnswer(skip=false){if(!current||revealed)return;if(!skip&&!$('answer').value.trim())return;revealed=true;chosen=skip?1:C.match($('answer').value,current.fr).score;$('answer').readOnly=true;$('answer-form').querySelector('.action-row').hidden=true;$('result').hidden=false;renderResult();persistDraft();if(!skip&&aiConfig.enabled&&aiConfig.key)runAI();}
+function revealAnswer(skip=false){if(!current||revealed)return;if(!skip&&!$('answer').value.trim())return;voice?.reset();revealed=true;chosen=skip?1:C.match($('answer').value,current.fr).score;$('answer').readOnly=true;$('answer-form').querySelector('.action-row').hidden=true;$('result').hidden=false;renderResult();persistDraft();if(!skip&&aiConfig.enabled&&aiConfig.key)runAI();}
 function proposed(){const prior=state.progress[current.id];if(manual&&prior&&prior.due>Date.now()&&chosen>=6)return {record:prior,early:true};return {record:C.schedule(prior,chosen),early:false};}
 function renderResult(){const m=C.match($('answer').value,current.fr);chosen=chosen||m.score;const hint=m.exact?'与参考表达一致（忽略大小写和标点）。':m.accentOnly?'表达一致，请留意法语重音符号。':'仅比较文字匹配度，不判断同义表达是否正确。你可以调整评分。';const diff=m.exact?'':`<details class="note"><summary>查看参考表达中的差异</summary><div class="diff" lang="fr">${diffMarkup($('answer').value,current.fr)}</div><p>高亮的是未匹配的参考词语，不代表你的替代表达一定有错。</p></details>`;
 $('result').innerHTML=`<div class="result-label">参考表达</div><div class="reference"><p lang="fr">${esc(current.fr)}</p></div><p class="note">${esc(current.note)}</p><div class="match-row"><span class="match-score">匹配建议 ${m.score} / 10</span><span class="match-hint">${hint}</span></div>${diff}<section id="ai-feedback" class="ai-feedback"></section><div class="score-title">这次，你觉得自己掌握了几分？</div><div class="score-buttons" role="group" aria-label="自评分 1 至 10">${Array.from({length:10},(_,i)=>`<button class="score-button${chosen===i+1?' chosen':''}" data-score="${i+1}" aria-pressed="${chosen===i+1}">${i+1}</button>`).join('')}</div><div class="score-key"><span>1–3 想不起来</span><span>4–6 还不熟练</span><span>7–9 基本掌握</span><span>10 完美</span></div><p class="next-preview" id="next-preview"></p><div class="save-row"><span class="muted">以你的最终评分安排复习</span><button class="primary" id="save-score">保存评分，下一条 →</button></div>`;
@@ -112,7 +116,7 @@ $('result').querySelectorAll('[data-score]').forEach(btn=>btn.addEventListener('
 function updatePreview(){const p=proposed();$('next-preview').textContent=p.early?`这是提前练习，保持原计划：${when(p.record.due)}复习。`:`下次安排：${nextCopy(p.record)}。`;}
 function saveScore(){if(!current||!revealed||!chosen)return;const id=current.id,score=chosen,p=proposed();state.progress[id]=p.record;state.history.push({id,at:Date.now(),score,answer:$('answer').value,reference:current.fr});state.draft=null;persist();toast(`已记录 ${score} 分 · ${p.early?'保留原复习日期':nextCopy(p.record)}`);chooseNext();}
 function setMode(next){mode=next;extra=false;state.draft=null;persist();document.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('selected',b.dataset.mode===mode));chooseNext();}
-function showView(next){view=next;['practice','library','plan'].forEach(v=>$(v+'-view').hidden=v!==next);document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===next));$('page-title').textContent={practice:'把想说的话，写成法语。',library:'每一种场景，都有话可说。',plan:'让记忆，在合适的时候回来。'}[next];if(next==='library')renderLibrary();if(next==='plan')renderPlan();if(next==='practice'){updateStats();if(!current)chooseNext();}}
+function showView(next){speaking?.reset();voice?.reset();view=next;['practice','library','plan'].forEach(v=>$(v+'-view').hidden=v!==next);document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===next));$('page-title').textContent={practice:'把想说的话，写成法语。',library:'每一种场景，都有话可说。',plan:'让记忆，在合适的时候回来。'}[next];if(next==='library')renderLibrary();if(next==='plan')renderPlan();if(next==='practice'){updateStats();if(!current)chooseNext();}}
 function startSingle(id){if(!deck.some(c=>c.id===id)){toast('此句集已暂停或表达已删除，请在表达库中加入练习。');return;}const due=C.dueCards(deck,state.progress);if(due.length){showView('practice');manual=false;showCard(due[0]);persistDraft();toast('请先完成到期复习；复习不占每日新学名额。');return;}manual=true;extra=true;showView('practice');manual=true;showCard(byId[id]);persistDraft();window.scrollTo({top:0,behavior:'smooth'});}
 function renderLibrary(){libraryUI.render();}
 function renderLibraryResults(){libraryUI.refresh();}
@@ -131,12 +135,35 @@ function rebuildCatalog(){
 function catalogChanged(){
  cancelAI();state.draft=null;rebuildCatalog();persist();chooseNext();if(view==='plan')renderPlan();
 }
+if(!storageBlocked){try{const packResult=window.ParolePacks.autoInstall(state,window.PAROLE_ORAL2_PACK);if(packResult.reason==='added'){const saved=persist();if(saved)toast('口语 2 资料已补充：'+packResult.added+' 条新表达。');}}catch(e){warning(e.message);}}
 rebuildCatalog();
 libraryUI=window.ParoleLibrary.create({container:$('library-view'),getState:()=>state,changed:catalogChanged,practice:startSingle,when});
 $('scope').innerHTML='<option value="all">全部新句类别</option>'+groupNames.map(g=>`<option>${esc(g)}</option>`).join('');$('scope').addEventListener('change',()=>{scope=$('scope').value;state.draft=null;persist();chooseNext();});document.querySelectorAll('[data-mode]').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.mode)));document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));$('answer-form').addEventListener('submit',e=>{e.preventDefault();revealAnswer();});$('answer').addEventListener('input',()=>{const text=$('answer').value.trim();$('word-count').textContent=(text?text.split(/\s+/).length:0)+' 词';$('reveal').disabled=!text;persistDraft();});$('answer').addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'&&!e.isComposing){e.preventDefault();revealAnswer();}});$('dont-know').addEventListener('click',()=>revealAnswer(true));$('settings-open').addEventListener('click',openSettings);$('goal-edit').addEventListener('click',openSettings);$('settings-close').addEventListener('click',()=>$('settings-dialog').close());$('settings-form').addEventListener('submit',e=>{e.preventDefault();const goal=Number($('goal-input').value),time=$('time-input').value;if(!Number.isInteger(goal)||goal<1||goal>100||!/^([01]\d|2[0-3]):[0-5]\d$/.test(time))return;state.settings={goal,time};persist();updateStats();if(view==='plan')renderPlan();if(!current&&view==='practice')chooseNext();toast('学习目标和提醒时间已保存');});$('notifications').addEventListener('click',requestNotifications);$('calendar').addEventListener('click',calendarDownload);$('export').addEventListener('click',()=>{download(JSON.stringify(state,null,2),`Parole-backup-${C.dayKey()}.json`,'application/json');$('backup-status').textContent='已导出，包含全部句集、表达、评分、复习计划、草稿和笔记，不包含 API Key。';});$('import').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>10*1024*1024)throw Error('备份文件过大');const incoming=Sets.validate(JSON.parse(await file.text()),seed,C);if(!window.confirm(`导入后会替换当前进度。备份包含 ${Object.keys(incoming.progress).length} 条已学表达。继续吗？`))return;state=incoming;rebuildCatalog();storageBlocked=false;const ok=persist();if(ok)$('storage-warning').hidden=true;current=null;extra=false;manual=false;chooseNext();if(view==='library')renderLibrary();if(view==='plan')renderPlan();$('backup-status').textContent=ok?'备份已导入。':'已导入到当前页面，但浏览器未能持久保存，请保留备份。';}catch(err){$('backup-status').textContent='导入失败：'+err.message+'。当前进度没有改变。';}finally{e.target.value='';}});
 window.addEventListener('storage',e=>{if(e.key!==KEY||!e.newValue)return;try{const incoming=Sets.validate(JSON.parse(e.newValue),seed,C);cancelAI();state=incoming;rebuildCatalog();chooseNext();if(view==='plan')renderPlan();if(view==='library')libraryUI.refresh();}catch{/* Invalid writes do not replace usable data. */}});
 
 updateStats();const pendingDue=C.dueCards(deck,state.progress);if(state.draft&&deck.some(c=>c.id===state.draft.id)&&(!pendingDue.length||pendingDue[0].id===state.draft.id)){manual=!!state.progress[state.draft.id]&&state.progress[state.draft.id].due>Date.now();showCard(byId[state.draft.id],state.draft);}else chooseNext();
+cloud=window.ParoleSync.create({storage:{getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value),removeItem:key=>localStorage.removeItem(key)},getState:()=>{if(storageBlocked)throw Error('本机存储不可用，请先导出备份。');return state;},validate:raw=>Sets.validate(raw,seed,C),applyState:raw=>{
+ const incoming=Sets.validate(raw,seed,C);
+ // Save a recovery copy before replacing local data. Failure aborts the pull.
+ localStorage.setItem('parole.before-cloud.v1',JSON.stringify(state));
+ localStorage.setItem(KEY,JSON.stringify(incoming));state=incoming;resetAI();current=null;rebuildCatalog();chooseNext();if(view==='library')libraryUI.refresh();if(view==='plan')renderPlan();
+},onStatus:(message,connected)=>{$('sync-status').textContent=message;document.querySelector('.local-badge').textContent=message;$('sync-now').disabled=!connected;$('sync-disconnect').disabled=!connected;},onConflict:conflict=>{
+ $('sync-conflict').hidden=!conflict;
+ if(conflict)$('sync-conflict-summary').textContent=`本机 ${conflict.local.history.length} 次练习；云端 ${conflict.remote?.history.length||0} 次练习。选择一份作为当前记录，另一份先保存为备份。`;
+}});
+$('sync-url').value=cloud.getConfig()?.url||'';
+$('sync-connect').onclick=()=>{try{cloud.connect($('sync-url').value,$('sync-key').value);$('sync-key').value='';cloud.sync();}catch(e){$('sync-status').textContent=e.message;}};
+$('sync-now').onclick=()=>cloud.sync();
+$('sync-disconnect').onclick=()=>{cloud.disconnect();$('sync-key').value='';};
+function resolveCloud(choice){const conflict=cloud.getConflict();if(!conflict)return;if(!confirm(choice==='push'?'以本机记录替换云端记录？会先下载被替换的云端备份。':'以云端记录替换本机记录？会先下载被替换的本机备份。'))return;
+ const backup=choice==='push'?conflict.remote:state;if(backup)download(JSON.stringify(backup,null,2),'Parole-sync-backup-'+Date.now()+'.json','application/json');cloud.sync(choice);
+}
+$('sync-local').onclick=()=>resolveCloud('push');$('sync-remote').onclick=()=>resolveCloud('pull');
+$('sync-recovery').onclick=()=>{const backup=localStorage.getItem('parole.before-cloud.v1');if(!backup){toast('还没有被云端替换的本机记录。');return;}download(backup,'Parole-before-cloud.json','application/json');};
+window.addEventListener('online',()=>cloud.sync());
+window.addEventListener('storage',e=>{if(e.key===window.ParoleSync.CONFIG){location.reload();}else if(e.key===KEY)cloud.changed();});
+setInterval(()=>{if(!document.hidden)cloud.sync();},60000);
+cloud.sync();
 setInterval(()=>{updateStats();if(view==='practice'&&!current)chooseNext();if(view==='plan')renderPlan();checkReminder();},30000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){updateStats();checkReminder();}});
 if(document.modelContext?.registerTool){try{Promise.resolve(document.modelContext.registerTool({name:'get_french_practice_status',title:'查看法语学习进度',description:'读取今日完成量、到期复习数量和当前中文题目，不揭示答案或修改进度。',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:true,untrustedContentHint:false},execute(input){if(!input||typeof input!=='object'||Object.keys(input).length)throw Error('不接受参数');const s=stats();return {newToday:s.today.size,reviewedToday:s.reviewed.size,dailyNewGoal:state.settings.goal,due:s.due.length,learned:s.learned,current:current?{id:current.id,prompt:current.zh}:null};}})).catch(()=>{});}catch{/* Optional browser API. */}}

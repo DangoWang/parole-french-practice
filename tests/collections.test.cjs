@@ -2,6 +2,12 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const S=require('../dist/collections.js'),C=require('../dist/core.js');
 const ctx={window:{}};vm.runInNewContext(fs.readFileSync(require.resolve('../dist/deck.js'),'utf8'),ctx);const seed=JSON.parse(JSON.stringify(ctx.window.PAROLE_DECK));
 const now=Date.now();
+test('set tags survive backups; older sets default to no tags',()=>{
+ const state=S.initial(seed,C);state.catalog.sets[0].tags=[' 口语 ','旅行','口语'];
+ const restored=S.validate(JSON.parse(JSON.stringify(state)),seed,C);assert.deepEqual(restored.catalog.sets[0].tags,['口语','旅行']);
+ delete state.catalog.sets[0].tags;assert.deepEqual(S.validate(state,seed,C).catalog.sets[0].tags,[]);
+ state.catalog.sets[0].tags=[{}];assert.throws(()=>S.validate(state,seed,C));
+});
 test('350 original expressions migrate with stable IDs and all learning records intact',()=>{
  const old=C.initialState();old.progress.A01=C.schedule(null,6,now);old.history=[{id:'A01',at:now,score:6,answer:'Bonjour',reference:'Salut'}];old.notes.A01='note';old.draft={id:'A02',answer:'Je',revealed:false,score:null};
  const migrated=S.validate(old,seed,C);assert.equal(migrated.catalog.sets[0].name,'TCF Tâche1');assert.equal(migrated.catalog.cards.length,350);assert.deepEqual(migrated.progress,old.progress);assert.deepEqual(migrated.history,old.history);assert.deepEqual(migrated.notes,old.notes);assert.deepEqual(migrated.draft,old.draft);assert.deepEqual(S.validate(JSON.parse(JSON.stringify(migrated)),seed,C),migrated);
