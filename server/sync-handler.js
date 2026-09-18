@@ -3,6 +3,20 @@ const {createHash,timingSafeEqual}=require('node:crypto');
 const Core=require('../dist/core.js');
 const Sets=require('../dist/collections.js');
 const MAX_BYTES=3*1024*1024;
+function databaseFailure(error){
+ const errors=[],seen=new Set();
+ function visit(e){if(!e||typeof e!=='object'||seen.has(e)||seen.size>30)return;seen.add(e);errors.push(e);visit(e.cause);visit(e.reason);if(e.servers instanceof Map)for(const s of e.servers.values())visit(s.error);}
+ visit(error);
+ // Match locally; never expose raw driver messages, URIs or credentials.
+ const has=(fn)=>errors.some(fn);
+ if(has(e=>e.code===18||e.codeName==='AuthenticationFailed'||/authentication failed|bad auth/i.test(e.message||'')))return {code:'DB_AUTH',error:'MongoDB 用户名或密码验证失败。请更新 Vercel 的 MONGODB_URI 为正确用户名和新密码，并重新部署。'};
+ if(has(e=>e.code===13||e.codeName==='Unauthorized'))return {code:'DB_PERMISSION',error:'数据库用户无权访问目标数据库。请检查 MONGODB_DB 以及该用户对它的读写权限。'};
+ if(has(e=>e.name==='MongoParseError'||e.name==='MongoInvalidArgumentError'))return {code:'DB_URI',error:'MongoDB 连接字符串格式不正确。请检查占位符、首尾引号和密码中特殊字符的 URL 编码，然后重新部署。'};
+ if(has(e=>['ENOTFOUND','ENODATA','ESERVFAIL'].includes(e.code)||/querySrv|queryTxt/.test(e.syscall||'')))return {code:'DB_DNS',error:'无法解析 MongoDB 集群地址。请从 Atlas 重新复制主机地址，确认集群仍在运行。'};
+ if(has(e=>/TLS|SSL|CERT/i.test(String(e.code||'')+' '+String(e.message||''))))return {code:'DB_TLS',error:'与 MongoDB 建立加密连接失败。请检查 Atlas 集群状态和 Vercel 函数日志中的诊断码。'};
+ if(has(e=>e.name==='MongoServerSelectionError'||e.name==='MongoNetworkError'||e.name==='MongoNetworkTimeoutError'||['ETIMEDOUT','ECONNREFUSED','ECONNRESET'].includes(e.code)))return {code:'DB_NETWORK',error:'无法连接 MongoDB 节点。请确认 Atlas IP Access List 已生效、集群未暂停，且连接字符串指向正确集群。'};
+ return {code:'DB_UNAVAILABLE',error:'数据库操作失败。本机记录已保留，请提供此诊断码以继续排查。'};
+}
 function cleanState(raw){
   if(raw?.version!==2)throw Error('Unsupported state');
   const state=Sets.validate(raw,[],Core);
@@ -57,7 +71,7 @@ function createHandler({getCollection,env=process.env}){
     if(result.matchedCount!==1)return res.status(409).json({error:'云端已有新记录，请重新同步。'});
    }
    return res.status(200).json({revision,updatedAt});
-  }catch{return res.status(503).json({error:'暂时无法连接数据库，请检查连接字符串和 Atlas 网络访问设置。本机记录仍保留。'});}
+  }catch(e){const failure=databaseFailure(e);console.error('Parole sync:',failure.code);return res.status(503).json(failure);}
  };
 }
-module.exports={createHandler,cleanState,authorized,MAX_BYTES};
+module.exports={createHandler,cleanState,authorized,MAX_BYTES,databaseFailure};
