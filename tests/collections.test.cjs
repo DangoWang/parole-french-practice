@@ -2,6 +2,14 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const S=require('../dist/collections.js'),C=require('../dist/core.js');
 const ctx={window:{}};vm.runInNewContext(fs.readFileSync(require.resolve('../dist/deck.js'),'utf8'),ctx);const seed=JSON.parse(JSON.stringify(ctx.window.PAROLE_DECK));
 const now=Date.now();
+test('only the written example is seeded; cloud-owned collections remain intact without content packs',()=>{
+ const state=S.initial(seed,C);assert.equal(state.catalog.sets.length,1);assert.equal(state.catalog.sets[0].name,'TCF Écrite Tâche1');
+ state.catalog.sets.push({id:'oral',name:'My edited oral collection',tags:['口语'],description:'personal',active:false,deleted:false,importedPacks:['old-pack']});
+ state.catalog.cards.push({id:'oral2-001',setId:'oral',zh:'测试',fr:'Bonjour !',group:'开场',note:'edited',star:false,deleted:false});
+ state.notes['oral2-001']='personal note';state.progress['oral2-001']=C.schedule(null,8,now);state.history.push({id:'oral2-001',at:now,score:8,answer:'Bonjour !'});
+ const restored=S.validate(JSON.parse(JSON.stringify(state)),seed,C);assert.deepEqual(restored,state);
+ for(const file of ['app.js','library.js','index.html'])assert.doesNotMatch(fs.readFileSync(require.resolve('../dist/'+file),'utf8'),/PAROLE_ORAL2_PACK|ParolePacks|oral-tache2\.js|content-packs\.js/);
+});
 test('set tags survive backups; older sets default to no tags',()=>{
  const state=S.initial(seed,C);state.catalog.sets[0].tags=[' 口语 ','旅行','口语'];
  const restored=S.validate(JSON.parse(JSON.stringify(state)),seed,C);assert.deepEqual(restored.catalog.sets[0].tags,['口语','旅行']);
@@ -10,7 +18,7 @@ test('set tags survive backups; older sets default to no tags',()=>{
 });
 test('350 original expressions migrate with stable IDs and all learning records intact',()=>{
  const old=C.initialState();old.progress.A01=C.schedule(null,6,now);old.history=[{id:'A01',at:now,score:6,answer:'Bonjour',reference:'Salut'}];old.notes.A01='note';old.draft={id:'A02',answer:'Je',revealed:false,score:null};
- const migrated=S.validate(old,seed,C);assert.equal(migrated.catalog.sets[0].name,'TCF Tâche1');assert.equal(migrated.catalog.cards.length,350);assert.deepEqual(migrated.progress,old.progress);assert.deepEqual(migrated.history,old.history);assert.deepEqual(migrated.notes,old.notes);assert.deepEqual(migrated.draft,old.draft);assert.deepEqual(S.validate(JSON.parse(JSON.stringify(migrated)),seed,C),migrated);
+ const migrated=S.validate(old,seed,C);assert.equal(migrated.catalog.sets[0].name,'TCF Écrite Tâche1');assert.equal(migrated.catalog.cards.length,350);assert.deepEqual(migrated.progress,old.progress);assert.deepEqual(migrated.history,old.history);assert.deepEqual(migrated.notes,old.notes);assert.deepEqual(migrated.draft,old.draft);assert.deepEqual(S.validate(JSON.parse(JSON.stringify(migrated)),seed,C),migrated);
 });
 function fixture(){const state=S.initial(seed,C);state.catalog.sets.push({id:'work',name:'工作',description:'',active:true,deleted:false});state.catalog.cards.push({id:'custom',setId:'work',zh:'你好',fr:'Bonjour',group:'问候',note:'',star:false,deleted:false});return state;}
 test('multiple active sets share daily new quota; paused reviews never enter queue',()=>{

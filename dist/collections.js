@@ -1,7 +1,7 @@
 (function(root){'use strict';
 const validId=s=>typeof s==='string'&&!['__proto__','prototype','constructor'].includes(s)&&/^[A-Za-z0-9_-]{1,100}$/.test(s);
 function normalizeTags(tags=[]){if(!Array.isArray(tags)||tags.length>20||tags.some(t=>typeof t!=='string'||t.length>30))throw Error('标签最多 20 个，每个不超过 30 字');return [...new Set(tags.map(t=>t.trim()).filter(Boolean))];}
-function catalog(seed){return {sets:[{id:'tcf-tache1',name:'TCF Tâche1',tags:[],description:'350 条 B1–B2 日常法语表达',active:true,deleted:false}],cards:seed.map(c=>({...c,setId:'tcf-tache1',deleted:false}))};}
+function catalog(seed){return {sets:[{id:'tcf-tache1',name:'TCF Écrite Tâche1',tags:[],description:'350 条 B1–B2 日常法语表达',active:true,deleted:false}],cards:seed.map(c=>({...c,setId:'tcf-tache1',deleted:false}))};}
 function validateCatalog(raw){
  if(!raw||!Array.isArray(raw.sets)||!Array.isArray(raw.cards)||raw.sets.length>1000||raw.cards.length>20000)throw Error('句集数据格式不正确');
  const ids=new Set(),cardIds=new Set();
