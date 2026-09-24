@@ -151,7 +151,7 @@ cloud=window.ParoleSync.create({account:ACCOUNT,accountReady:()=>!ACCOUNT||local
  $('sync-conflict').hidden=!conflict;
  if(conflict)$('sync-conflict-summary').textContent=`本机 ${conflict.local.history.length} 次练习；云端 ${conflict.remote?.history.length||0} 次练习。选择一份作为当前记录，另一份先保存为备份。`;
 }});
-$('sync-url').value=cloud.getConfig()?.url||'';if(ACCOUNT){for(const id of ['sync-url','sync-key','sync-connect','sync-disconnect']){$(id).hidden=true;document.querySelector('label[for="'+id+'"]')?.setAttribute('hidden','');} $('sync-title').nextElementSibling.textContent='已使用 Google 账户同步；不需要同步密钥。';}
+$('sync-url').value=cloud.getConfig()?.url||'';if(ACCOUNT){for(const id of ['sync-url','sync-key','sync-connect','sync-disconnect']){$(id).hidden=true;document.querySelector('label[for="'+id+'"]')?.setAttribute('hidden','');} $('sync-title').nextElementSibling.textContent='已使用 Google 账户同步；不需要同步密钥。';$('sync-key').nextElementSibling.textContent='当前账户的数据独立保存。多设备有不同修改时，会先比较记录，避免直接覆盖。';}
 $('sync-connect').onclick=()=>{try{cloud.connect($('sync-url').value,$('sync-key').value);$('sync-key').value='';cloud.sync();}catch(e){$('sync-status').textContent=e.message;}};
 $('sync-now').onclick=()=>cloud.sync();
 $('sync-disconnect').onclick=()=>{cloud.disconnect();$('sync-key').value='';};
