@@ -28,13 +28,14 @@ function authorized(header,key){
   const hash=v=>createHash('sha256').update(v).digest();
   return timingSafeEqual(hash(header),hash('Bearer '+key));
 }
-function createHandler({getCollection,env=process.env}){
+function createHandler({getCollection,getSession,env=process.env}){
  return async function handler(req,res){
   res.setHeader('Cache-Control','no-store');res.setHeader('Vary','Origin');
   res.setHeader('X-Content-Type-Options','nosniff');
   const origin=req.headers.origin;
   const origins=(env.ALLOWED_ORIGINS||'').split(',').map(s=>s.trim()).filter(Boolean);
   // Vercel's assigned host is trusted configuration, not a client Host header.
+  if(getSession)origins.push(require('./auth').origin(env));
   if(env.VERCEL_PROJECT_PRODUCTION_URL)origins.push('https://'+env.VERCEL_PROJECT_PRODUCTION_URL);
   if(origin&&!origins.includes(origin))return res.status(403).json({error:'此网页未获准连接同步服务。'});
   if(origin)res.setHeader('Access-Control-Allow-Origin',origin);
@@ -42,8 +43,16 @@ function createHandler({getCollection,env=process.env}){
   res.setHeader('Access-Control-Allow-Headers','Authorization, Content-Type');
   if(req.method==='OPTIONS')return res.status(204).end();
   if(!['GET','PUT'].includes(req.method))return res.status(405).json({error:'不支持此操作。'});
-  if(!env.PAROLE_SYNC_KEY||env.PAROLE_SYNC_KEY.length<32||!env.MONGODB_URI)return res.status(503).json({error:'后端尚未配置完成。'});
-  if(!authorized(req.headers.authorization,env.PAROLE_SYNC_KEY))return res.status(401).json({error:'同步密钥不正确。'});
+  let owner='personal';
+  if(getSession&&req.headers['x-parole-account']){
+   if(req.method==='PUT'&&req.headers.origin!==require('./auth').origin(env))return res.status(403).json({error:'请从登录网站内同步。'});
+   let user;try{user=await getSession(req);}catch{return res.status(503).json({error:'登录服务暂不可用。'});}
+   if(!user||user.userId!==req.headers['x-parole-account'])return res.status(401).json({error:'登录已失效或账户已切换，请刷新后登录。'});
+   owner=user.userId;
+  }else{
+   if(!env.PAROLE_SYNC_KEY||env.PAROLE_SYNC_KEY.length<32||!env.MONGODB_URI)return res.status(503).json({error:'后端尚未配置完成。'});
+   if(!authorized(req.headers.authorization,env.PAROLE_SYNC_KEY))return res.status(401).json({error:'同步密钥不正确。'});
+  }
   let payload;
   if(req.method==='PUT'){
    if(!/^application\/json(?:;|$)/i.test(req.headers['content-type']||''))return res.status(415).json({error:'需要 JSON 数据。'});
@@ -58,16 +67,16 @@ function createHandler({getCollection,env=process.env}){
   try{
    const col=await getCollection();
    if(req.method==='GET'){
-    const doc=await col.findOne({_id:'personal'});
+    const doc=await col.findOne({_id:owner});
     return res.status(200).json(doc?{revision:doc.revision,state:doc.state,updatedAt:doc.updatedAt}:{revision:0,state:null});
    }
    const updatedAt=new Date().toISOString(),revision=payload.revision+1;
    // Atomic compare-and-set: a stale device can never overwrite newer data.
    if(payload.revision===0){
-    try{await col.insertOne({_id:'personal',revision,state:payload.state,updatedAt});}
+    try{await col.insertOne({_id:owner,revision,state:payload.state,updatedAt});}
     catch(e){if(e.code===11000)return res.status(409).json({error:'云端已有新记录，请重新同步。'});throw e;}
    }else{
-    const result=await col.updateOne({_id:'personal',revision:payload.revision},{$set:{revision,state:payload.state,updatedAt}});
+    const result=await col.updateOne({_id:owner,revision:payload.revision},{$set:{revision,state:payload.state,updatedAt}});
     if(result.matchedCount!==1)return res.status(409).json({error:'云端已有新记录，请重新同步。'});
    }
    return res.status(200).json({revision,updatedAt});

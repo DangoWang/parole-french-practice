@@ -1,12 +1,4 @@
 'use strict';
-const {MongoClient}=require('mongodb');
-const {createHandler}=require('../server/sync-handler.js');
-let connection;
-async function getCollection(){
- if(!connection){
-  const client=new MongoClient(process.env.MONGODB_URI,{maxPoolSize:3,minPoolSize:0,maxIdleTimeMS:60000,serverSelectionTimeoutMS:8000,connectTimeoutMS:8000});
-  connection=client.connect().catch(async e=>{connection=null;await client.close().catch(()=>{});throw e;});
- }
- return (await connection).db(process.env.MONGODB_DB||'parole').collection('study');
-}
-module.exports=createHandler({getCollection});
+const {getDatabase}=require('../server/database');
+const {session,origin}=require('../server/auth');
+module.exports=require('../server/sync-handler').createHandler({getCollection:async()=>(await getDatabase()).collection('study'),getSession:async req=>session(req,await getDatabase())});

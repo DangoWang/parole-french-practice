@@ -3,6 +3,21 @@
   "framework": null,
   "buildCommand": "",
   "outputDirectory": "dist",
-  "regions": ["pdx1"],
-  "functions": { "api/sync.js": { "maxDuration": 30 } }
+  "regions": [
+    "pdx1"
+  ],
+  "functions": {
+    "api/sync.js": {
+      "maxDuration": 30
+    },
+    "api/auth.js": {
+      "maxDuration": 30
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/auth/:action*",
+      "destination": "/api/auth?action=:action*"
+    }
+  ]
 }

@@ -2,7 +2,14 @@
   "name": "parole-french-practice",
   "version": "1.0.0",
   "private": true,
-  "scripts": { "test": "node --test tests/*.test.cjs" },
-  "engines": { "node": "24.x" },
-  "dependencies": { "mongodb": "^6.20.0" }
+  "scripts": {
+    "test": "node --test tests/*.test.cjs"
+  },
+  "engines": {
+    "node": "24.x"
+  },
+  "dependencies": {
+    "google-auth-library": "^11.1.0",
+    "mongodb": "^6.20.0"
+  }
 }

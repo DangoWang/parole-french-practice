@@ -2,7 +2,7 @@
 window.PAROLE_SITE_URL="https://parole-tcf-practice.alanyoyo.chatgpt.site";
 const C=window.ParoleCore,Sets=window.ParoleCollections,seed=window.PAROLE_DECK;
 let deck=[],ids=new Set(),byId={},groupNames=[];let libraryUI;
-const KEY='parole.study.v2',LEGACY_KEY='parole.study.v1', $=id=>document.getElementById(id), esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ACCOUNT=window.ParoleAccount,SUFFIX=ACCOUNT?'.'+ACCOUNT.id:'',KEY='parole.study.v2'+SUFFIX,LEGACY_KEY=ACCOUNT?KEY:'parole.study.v1', $=id=>document.getElementById(id), esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 let state=Sets.initial(seed,C),current=null,revealed=false,chosen=null,mode='daily',scope='all',view='practice',extra=false,manual=false,libraryPage=0,toastTimer,storageBlocked=false;
 
@@ -142,16 +142,16 @@ $('scope').innerHTML='<option value="all">全部新句类别</option>'+groupName
 window.addEventListener('storage',e=>{if(e.key!==KEY||!e.newValue)return;try{const incoming=Sets.validate(JSON.parse(e.newValue),seed,C);cancelAI();state=incoming;rebuildCatalog();chooseNext();if(view==='plan')renderPlan();if(view==='library')libraryUI.refresh();}catch{/* Invalid writes do not replace usable data. */}});
 
 updateStats();const pendingDue=C.dueCards(deck,state.progress);if(state.draft&&deck.some(c=>c.id===state.draft.id)&&(!pendingDue.length||pendingDue[0].id===state.draft.id)){manual=!!state.progress[state.draft.id]&&state.progress[state.draft.id].due>Date.now();showCard(byId[state.draft.id],state.draft);}else chooseNext();
-cloud=window.ParoleSync.create({storage:{getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value),removeItem:key=>localStorage.removeItem(key)},getState:()=>{if(storageBlocked)throw Error('本机存储不可用，请先导出备份。');return state;},validate:raw=>Sets.validate(raw,seed,C),applyState:raw=>{
+cloud=window.ParoleSync.create({account:ACCOUNT,accountReady:()=>!ACCOUNT||localStorage.getItem('parole.account-ready.'+ACCOUNT.id)==='1',storage:{getItem:key=>localStorage.getItem(key+SUFFIX),setItem:(key,value)=>localStorage.setItem(key+SUFFIX,value),removeItem:key=>localStorage.removeItem(key+SUFFIX)},getState:()=>{if(storageBlocked)throw Error('本机存储不可用，请先导出备份。');return state;},validate:raw=>Sets.validate(raw,seed,C),applyState:raw=>{
  const incoming=Sets.validate(raw,seed,C);
  // Save a recovery copy before replacing local data. Failure aborts the pull.
- localStorage.setItem('parole.before-cloud.v1',JSON.stringify(state));
+ localStorage.setItem('parole.before-cloud.v1'+SUFFIX,JSON.stringify(state));
  localStorage.setItem(KEY,JSON.stringify(incoming));state=incoming;resetAI();current=null;rebuildCatalog();chooseNext();if(view==='library')libraryUI.refresh();if(view==='plan')renderPlan();
 },onStatus:(message,connected)=>{$('sync-status').textContent=message;document.querySelector('.local-badge').textContent=message;$('sync-now').disabled=!connected;$('sync-disconnect').disabled=!connected;},onConflict:conflict=>{
  $('sync-conflict').hidden=!conflict;
  if(conflict)$('sync-conflict-summary').textContent=`本机 ${conflict.local.history.length} 次练习；云端 ${conflict.remote?.history.length||0} 次练习。选择一份作为当前记录，另一份先保存为备份。`;
 }});
-$('sync-url').value=cloud.getConfig()?.url||'';
+$('sync-url').value=cloud.getConfig()?.url||'';if(ACCOUNT){for(const id of ['sync-url','sync-key','sync-connect','sync-disconnect']){$(id).hidden=true;document.querySelector('label[for="'+id+'"]')?.setAttribute('hidden','');} $('sync-title').nextElementSibling.textContent='已使用 Google 账户同步；不需要同步密钥。';}
 $('sync-connect').onclick=()=>{try{cloud.connect($('sync-url').value,$('sync-key').value);$('sync-key').value='';cloud.sync();}catch(e){$('sync-status').textContent=e.message;}};
 $('sync-now').onclick=()=>cloud.sync();
 $('sync-disconnect').onclick=()=>{cloud.disconnect();$('sync-key').value='';};
@@ -159,7 +159,7 @@ function resolveCloud(choice){const conflict=cloud.getConflict();if(!conflict)re
  const backup=choice==='push'?conflict.remote:state;if(backup)download(JSON.stringify(backup,null,2),'Parole-sync-backup-'+Date.now()+'.json','application/json');cloud.sync(choice);
 }
 $('sync-local').onclick=()=>resolveCloud('push');$('sync-remote').onclick=()=>resolveCloud('pull');
-$('sync-recovery').onclick=()=>{const backup=localStorage.getItem('parole.before-cloud.v1');if(!backup){toast('还没有被云端替换的本机记录。');return;}download(backup,'Parole-before-cloud.json','application/json');};
+$('sync-recovery').onclick=()=>{const backup=localStorage.getItem('parole.before-cloud.v1'+SUFFIX);if(!backup){toast('还没有被云端替换的本机记录。');return;}download(backup,'Parole-before-cloud.json','application/json');};
 window.addEventListener('online',()=>cloud.sync());
 window.addEventListener('storage',e=>{if(e.key===window.ParoleSync.CONFIG){location.reload();}else if(e.key===KEY)cloud.changed();});
 setInterval(()=>{if(!document.hidden)cloud.sync();},60000);
