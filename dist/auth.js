@@ -7,7 +7,7 @@
  const accountButton=document.createElement('button');accountButton.className='subtle';accountButton.textContent='Google 登录';document.getElementById('settings-open').before(accountButton);
  accountButton.onclick=()=>{document.getElementById('settings-dialog').showModal();box.scrollIntoView({block:'start'});};
  const button=(text,action)=>{const b=document.createElement('button');b.type='button';b.className='secondary';b.textContent=text;b.onclick=action;box.append(b);return b;};
- const launch=()=>{const script=document.createElement('script');script.src='app.js';document.body.append(script);};
+ const launch=()=>{const script=document.createElement('script');script.src='app.js?v=google-auth-1';document.body.append(script);};
  if(location.origin!==ORIGIN){status.textContent='Google 登录请使用 Vercel 版。旧版学习记录仍可继续同步。';button('打开 Google 登录版',()=>location.assign(ORIGIN));launch();return;}
  async function request(path,options={}){const r=await fetch('/api/auth/'+path,{...options,credentials:'same-origin',cache:'no-store'});const data=await r.json();if(!r.ok)throw Error(data.error||'无法连接登录服务。');return data;}
  try{
