@@ -39,6 +39,12 @@ Parole 面向 B1–B2 学习者，帮助你按各种 topic 积累日常表达，
 
 ## 按话题积累表达
 
+在句集中点击「添加表达」，可选择 **单条添加** 或 **AI 批量生成**。批量生成可填写应用场景、单条期望长度、风格（自然口语、边想边说、日常书面语、正式书面语）和数量（1–50 条，默认 20）。使用已保存的 OpenAI API Key 调用 [GPT-5.4 mini](https://developers.openai.com/api/docs/models/gpt-5.4-mini)，按 API 用量计费；学习语言沿用学习设置。
+
+生成后先预览：可编辑题目、参考表达、类别、说明和优先标记，取消勾选不需要的表达，再点击「加入当前句集」。加入时跳过当前句集中相同的参考表达，不覆盖已有句子或练习记录。生成失败、取消或关闭预览不会自动添加；重新生成会先确认是否替换预览。
+
+Choose **Add one** or **Generate with AI** inside a set. Describe a situation, expected length, style and quantity, then review and edit the generated items before adding them. Uses your saved API key and chosen learning languages. Existing progress is retained; exact duplicate expressions in the destination set are skipped.
+
 表达库按「句集」组织。初始 350 条表达放在 **TCF Écrite Tâche1** 中；可以新建、搜索、编辑和归档自己的句集。
 
 - 勾选「加入每日练习」可同时启用多个句集，合计共用每日新学目标（默认 20 条）。切换句集不会重置当天已完成的新学数量。
