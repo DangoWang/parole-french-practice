@@ -5,6 +5,9 @@ const C=require('../dist/core.js');
 const card={zh:'我建议你预订。',fr:'Je te conseille de réserver.',group:'旅行'};
 const feedback={score:10,explanation:'同义表达正确。',corrected:'Je te recommande de réserver.',errors:[]};
 const response=v=>({ok:true,json:async()=>({status:'completed',output:[{type:'reasoning'},{type:'message',content:[{type:'output_text',text:JSON.stringify(v)}]}]})});
+test('HTTP authentication error remains actionable when its body is unreadable',async()=>{
+ await assert.rejects(AI.grade({key:'fixture',card,answer:'Bonjour',fetchImpl:async()=>({ok:false,status:401,json:async()=>{throw new SyntaxError('not json');}})}),/密钥无效/);
+});
 test('request sends only the current exercise to OpenAI; key stays in authorization header',async()=>{
  let request;
  const result=await AI.grade({key:'test-credential',card,answer:feedback.corrected,fetchImpl:async(url,options)=>{request={url,...options};return response(feedback);}});

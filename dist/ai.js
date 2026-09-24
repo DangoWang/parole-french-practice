@@ -34,12 +34,12 @@ async function grade({key,card,answer,signal,languages=Languages.get(),fetchImpl
  const timer=setTimeout(()=>{timedOut=true;controller.abort();},timeoutMs);
  try{
   const response=await fetchImpl(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+key.trim()},body:JSON.stringify(requestBody(card,answer,languages)),signal:controller.signal,credentials:'omit',redirect:'error',referrerPolicy:'no-referrer'});
-  let body;try{body=await response.json();}catch{throw Error('服务返回了无法读取的结果，请稍后重试。');}
+  let body;try{body=await response.json();}catch{if(!response.ok)throw Error(httpError(response.status));throw Error('服务返回了无法读取的结果，请稍后重试。');}
   if(!response.ok)throw Error(httpError(response.status,body?.error?.code));
   return parseResponse(body);
  }catch(e){
   if(controller.signal.aborted){if(timedOut)throw Error('评分超过 45 秒，请手动重试或自行评分。');throw new DOMException('Cancelled','AbortError');}
-  if(e instanceof TypeError)throw Error('无法连接 OpenAI，请检查网络或浏览器访问限制。');
+  if(e instanceof TypeError)throw Error('浏览器无法读取 OpenAI 响应，可能是网络或跨域拦截。若开发者工具显示 401，请在学习设置中重新保存有效的 API Key 并测试连接；页面无法读取被拦截响应的具体原因。');
   throw e;
  }finally{clearTimeout(timer);signal?.removeEventListener('abort',cancel);}
 }
