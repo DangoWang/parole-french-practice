@@ -5,9 +5,10 @@ function canonical(value){if(Array.isArray(value))return '['+value.map(canonical
 async function fingerprint(state){return Array.from(new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256',new TextEncoder().encode(canonical(snapshot(state))))),x=>x.toString(16).padStart(2,'0')).join('');}
 function endpoint(value){const u=new URL(value);if(u.protocol!=='https:'||u.username||u.password||u.search||u.hash||!['','/','/api/sync'].includes(u.pathname))throw Error('请输入 HTTPS 后端网址，例如 https://你的项目.vercel.app');return u.origin;}
 function decide(localHash,remoteHash,meta,revision){if(localHash===remoteHash)return 'same';if(!remoteHash)return meta?.revision?'conflict':'push';if(!meta)return 'conflict';if(localHash===meta.hash)return 'pull';if(revision===meta.revision)return 'push';return 'conflict';}
-function create({account=null,accountReady=()=>true,storage,getState,applyState,validate,onStatus=()=>{},onConflict=()=>{},fetchImpl=fetch}){
+function create({account=null,requireAccount=false,storage,getState,applyState,validate,onStatus=()=>{},onConflict=()=>{},fetchImpl=fetch}){
  let config=null,meta=null,busy=false,timer,generation=0,controller,conflict=null,again=false;
  try{config=JSON.parse(storage.getItem(CONFIG));meta=JSON.parse(storage.getItem(META));if(config){config.url=endpoint(config.url);if(typeof config.key!=='string'||config.key.length<32)config=null;}if(meta?.url!==config?.url)meta=null;}catch{config=null;meta=null;}
+ if(requireAccount&&!account){config=null;meta=null;}
  if(account){config={url:location.origin,account:account.id};}
  const status=message=>onStatus(message,!!config);
  function loadMeta(){try{const m=JSON.parse(storage.getItem(META));meta=m?.url===config?.url?m:null;}catch{meta=null;}}
@@ -21,7 +22,7 @@ function create({account=null,accountReady=()=>true,storage,getState,applyState,
   }finally{clearTimeout(timeout);}
  }
  async function sync(choice){
-  if(!config)return;if(account&&!accountReady()){status('请选择迁移旧记录，或从示例句集开始。');return;}if(busy){again=true;return;}if(conflict&&!choice)return;
+  if(!config)return;if(busy){again=true;return;}if(conflict&&!choice)return;
   busy=true;again=false;const token=generation;controller=new AbortController();status('正在同步…');
   try{
    loadMeta();const remote=await request('GET');if(token!==generation)return;

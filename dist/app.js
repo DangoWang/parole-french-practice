@@ -142,19 +142,17 @@ $('scope').innerHTML='<option value="all">全部新句类别</option>'+groupName
 window.addEventListener('storage',e=>{if(e.key!==KEY||!e.newValue)return;try{const incoming=Sets.validate(JSON.parse(e.newValue),seed,C);cancelAI();state=incoming;rebuildCatalog();chooseNext();if(view==='plan')renderPlan();if(view==='library')libraryUI.refresh();}catch{/* Invalid writes do not replace usable data. */}});
 
 updateStats();const pendingDue=C.dueCards(deck,state.progress);if(state.draft&&deck.some(c=>c.id===state.draft.id)&&(!pendingDue.length||pendingDue[0].id===state.draft.id)){manual=!!state.progress[state.draft.id]&&state.progress[state.draft.id].due>Date.now();showCard(byId[state.draft.id],state.draft);}else chooseNext();
-cloud=window.ParoleSync.create({account:ACCOUNT,accountReady:()=>!ACCOUNT||localStorage.getItem('parole.account-ready.'+ACCOUNT.id)==='1',storage:{getItem:key=>localStorage.getItem(key+SUFFIX),setItem:(key,value)=>localStorage.setItem(key+SUFFIX,value),removeItem:key=>localStorage.removeItem(key+SUFFIX)},getState:()=>{if(storageBlocked)throw Error('本机存储不可用，请先导出备份。');return state;},validate:raw=>Sets.validate(raw,seed,C),applyState:raw=>{
+cloud=window.ParoleSync.create({account:ACCOUNT,requireAccount:true,storage:{getItem:key=>localStorage.getItem(key+SUFFIX),setItem:(key,value)=>localStorage.setItem(key+SUFFIX,value),removeItem:key=>localStorage.removeItem(key+SUFFIX)},getState:()=>{if(storageBlocked)throw Error('本机存储不可用，请先导出备份。');return state;},validate:raw=>Sets.validate(raw,seed,C),applyState:raw=>{
  const incoming=Sets.validate(raw,seed,C);
  // Save a recovery copy before replacing local data. Failure aborts the pull.
  localStorage.setItem('parole.before-cloud.v1'+SUFFIX,JSON.stringify(state));
  localStorage.setItem(KEY,JSON.stringify(incoming));state=incoming;resetAI();current=null;rebuildCatalog();chooseNext();if(view==='library')libraryUI.refresh();if(view==='plan')renderPlan();
-},onStatus:(message,connected)=>{$('sync-status').textContent=message;document.querySelector('.local-badge').textContent=message;$('sync-now').disabled=!connected;$('sync-disconnect').disabled=!connected;},onConflict:conflict=>{
+},onStatus:(message,connected)=>{$('sync-status').textContent=message;document.querySelector('.local-badge').textContent=message;$('sync-now').disabled=!connected;},onConflict:conflict=>{
  $('sync-conflict').hidden=!conflict;
  if(conflict)$('sync-conflict-summary').textContent=`本机 ${conflict.local.history.length} 次练习；云端 ${conflict.remote?.history.length||0} 次练习。选择一份作为当前记录，另一份先保存为备份。`;
 }});
-$('sync-url').value=cloud.getConfig()?.url||'';if(ACCOUNT){for(const id of ['sync-url','sync-key','sync-connect','sync-disconnect']){$(id).hidden=true;document.querySelector('label[for="'+id+'"]')?.setAttribute('hidden','');} $('sync-title').nextElementSibling.textContent='已使用 Google 账户同步；不需要同步密钥。';$('sync-key').nextElementSibling.textContent='当前账户的数据独立保存。多设备有不同修改时，会先比较记录，避免直接覆盖。';}
-$('sync-connect').onclick=()=>{try{cloud.connect($('sync-url').value,$('sync-key').value);$('sync-key').value='';cloud.sync();}catch(e){$('sync-status').textContent=e.message;}};
+$('sync-title').parentElement.hidden=!ACCOUNT;
 $('sync-now').onclick=()=>cloud.sync();
-$('sync-disconnect').onclick=()=>{cloud.disconnect();$('sync-key').value='';};
 function resolveCloud(choice){const conflict=cloud.getConflict();if(!conflict)return;if(!confirm(choice==='push'?'以本机记录替换云端记录？会先下载被替换的云端备份。':'以云端记录替换本机记录？会先下载被替换的本机备份。'))return;
  const backup=choice==='push'?conflict.remote:state;if(backup)download(JSON.stringify(backup,null,2),'Parole-sync-backup-'+Date.now()+'.json','application/json');cloud.sync(choice);
 }
