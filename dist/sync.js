@@ -49,7 +49,7 @@ function create({account=null,requireAccount=false,storage,getState,applyState,v
     const response=await request('PUT',{revision:remote.revision,state:local});if(token!==generation)return;
     saveMeta(response.revision,localHash);
    }else saveMeta(remote.revision,localHash);
-   conflict=null;onConflict(null);status('已同步 · '+new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}));
+   conflict=null;onConflict(null);status('已同步 · '+new Date().toLocaleTimeString(root.ParoleUI?.locale()||'en-US',{hour:'2-digit',minute:'2-digit'}));
   }catch(e){if(token===generation)status(e.name==='AbortError'?'同步超时，本机记录已保留。':e.message);}
   finally{busy=false;controller=null;if(again&&token===generation)changed();}
  }

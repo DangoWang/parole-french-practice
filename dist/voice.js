@@ -1,16 +1,17 @@
 (function(root){'use strict';
-async function transcribe({key,blob,signal,fetchImpl=fetch}){
+const Languages=root.ParoleLanguages||(typeof require==='function'?require('./languages.js'):null);
+async function transcribe({key,blob,signal,language=Languages.get().targetLanguage,fetchImpl=fetch}){
  if(!key)throw new Error('请先在学习设置中保存 OpenAI API Key。');
  if(!blob?.size)throw new Error('没有录到声音，请重新录音。');
  if(blob.size>24000000)throw new Error('录音过大，请缩短后重试。');
- const form=new FormData();form.append('model','gpt-4o-mini-transcribe');form.append('language','fr');form.append('response_format','json');
+ const form=new FormData();form.append('model','gpt-4o-mini-transcribe');form.append('language',Languages.normalize({targetLanguage:language}).targetLanguage);form.append('response_format','json');
  form.append('file',blob,'parole.'+(blob.type.includes('mp4')?'mp4':blob.type.includes('ogg')?'ogg':'webm'));
  const controller=new AbortController(),abort=()=>controller.abort();signal?.addEventListener('abort',abort,{once:true});if(signal?.aborted)abort();
  const timer=setTimeout(abort,60000);
  try{
   const response=await fetchImpl('https://api.openai.com/v1/audio/transcriptions',{method:'POST',headers:{Authorization:'Bearer '+key},body:form,signal:controller.signal});
   if(!response.ok)throw new Error(response.status===401?'API Key 无效，请检查学习设置。':response.status===429?'额度不足或请求过于频繁，请稍后重试。':'转写失败，请检查网络和模型访问权限后重试。');
-  const data=await response.json();if(typeof data.text!=='string'||!data.text.trim())throw new Error('没有识别到文字，请清晰说出法语后重试。');return data.text.trim();
+  const data=await response.json();if(typeof data.text!=='string'||!data.text.trim())throw new Error('没有识别到文字，请清晰说出目标语言后重试。');return data.text.trim();
  }catch(e){if(signal?.aborted)throw new DOMException('已取消','AbortError');if(controller.signal.aborted)throw new Error('转写超时，请重试。');if(e instanceof TypeError)throw new Error('无法连接 OpenAI，请检查网络后重试。');throw e;}
  finally{clearTimeout(timer);signal?.removeEventListener('abort',abort);}
 }
@@ -20,8 +21,8 @@ function mount({getKey,canRecord,onText,onStart=()=>{},onRecording=()=>{},docume
  function release(){clearInterval(timer);timer=null;stream?.getTracks().forEach(t=>t.stop());stream=null;}
  function buttons(active=false){busy=active;start.disabled=active;stop.hidden=true;cancel.hidden=!active;retry.hidden=true;}
  function display(){panel.hidden=!toggle.checked;$('answer').hidden=toggle.checked;}
- function reset(keepMode=false){if(!keepMode)toggle.checked=false;display();generation++;controller?.abort();controller=null;if(recorder?.state==='recording')recorder.stop();recorder=null;release();audio=null;buttons();status.textContent='点击开始录音，用法语表达。';}
- async function send(blob,id){controller=new AbortController();buttons(true);status.textContent='正在转成法语…';try{const text=await transcribe({key:getKey(),blob,signal:controller.signal});if(id!==generation||!canRecord())return;toggle.checked=false;display();onText(text);audio=null;status.textContent='已填入法语输入框，可修改后确认。';}catch(e){if(id!==generation)return;status.textContent=e.message;}finally{if(id===generation){controller=null;buttons();retry.hidden=!audio;}}}
+ function reset(keepMode=false){if(!keepMode)toggle.checked=false;display();generation++;controller?.abort();controller=null;if(recorder?.state==='recording')recorder.stop();recorder=null;release();audio=null;buttons();status.textContent='点击开始录音，用目标语言表达。';}
+ async function send(blob,id){controller=new AbortController();buttons(true);status.textContent='正在转写录音…';try{const text=await transcribe({key:getKey(),blob,signal:controller.signal});if(id!==generation||!canRecord())return;toggle.checked=false;display();onText(text);audio=null;status.textContent='已填入表达输入框，可修改后确认。';}catch(e){if(id!==generation)return;status.textContent=e.message;}finally{if(id===generation){controller=null;buttons();retry.hidden=!audio;}}}
  toggle.onchange=()=>{reset(true);};
  start.onclick=async()=>{
   if(busy||!canRecord()){status.textContent='请先开始一道尚未确认的练习。';return;}

@@ -1,18 +1,28 @@
-# Parole · 法语日常表达练习
+# Parole · Everyday language practice / 日常语言表达练习
 
-把想说的话，写成法语。Parole 面向 B1–B2 学习者，帮助你按各种 topic 积累日常法语表达，通过主动回忆和间隔复习，把表达真正记住。
+Parole helps you practise everyday expressions across topics through active recall, AI feedback and spaced repetition. The interface defaults to English and can switch to Chinese. Choose your prompt/explanation language and the language you want to practise independently.
+
+Parole 面向 B1–B2 学习者，帮助你按各种 topic 积累日常表达，通过主动回忆和间隔复习，把表达真正记住。法语示例句集可以用于 TCF 备考，也可以创建其他语言的句集。
+
+## Languages & account / 语言与账户
+
+- Click the person icon at the top right for interface language, learning languages, settings/backup and Google sign-in. The sidebar can collapse; both UI preferences stay in this browser.
+- Learning settings support Chinese, English, French, Spanish, German, Italian, Portuguese, Japanese, Korean, Arabic, Russian and Hindi. Text assessment and audio assessment use the selected pair; speech transcription uses the target language.
+- Learning languages are included in study backups and account sync. Existing sets, answers, notes and history are not translated or rewritten. Pick or create sets that match your language pair. Existing records default to Chinese → French.
+- 界面语言与学习语言独立：右上角切换中文/英文；学习设置选择提示与解释语言、目标语言。学习语言随账户同步，界面语言和导航收起状态保存在当前浏览器。
+- 登录使用 Google 账户；无需旧版同步密钥。键盘输入使用文字评分，录音输入使用口语评分，模型反馈以意思准确、自然表达为先。
 
 它也可以用于准备 **TCF 写作任务 1 和 2（Tâche 1 / Tâche 2）**：练习邀请、推荐、叙事与描述，积累各种场景的句子，再迁移到消息、邮件和经历分享等写作中。它是表达训练工具，不是整篇作文的自动评分系统。
 
 ## 怎么练习
 
-1. 看中文提示，自己输入法语。
+1. 看提示，用目标语言输入表达（也可录音转写）。
 2. 确认后揭晓参考表达，查看词语差异。
 3. 参考文字匹配建议，给自己打 1–10 分。
 4. 保存评分，系统安排下次复习。
 5. 在本句笔记中记录搭配、语法和易错点。
 
-每个句子都有独立练习历史，保留时间、你输入的法语和分数，并高亮与参考表达不一致的词语。
+每个句子都有独立练习历史，保留时间、你输入的表达和分数，并高亮与参考表达不一致的词语。以下截图展示原有中文学法语的用法。
 
 ![练习页面：中文提示、法语输入、本句历史与笔记](docs/images/practice.png)
 
