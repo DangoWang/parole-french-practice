@@ -5,3 +5,14 @@ test('feedback sends actual audio with a reference as context but no edited tran
 test('API errors are sanitized; truncated feedback is rejected; cancellation aborts request',async()=>{const options={key:'x',wav:S.pcmWav(new Float32Array([0])),card:{zh:'你好',group:'日常'}};await assert.rejects(S.assess({...options,fetchImpl:async()=>({ok:false,status:401})}),/Key/);await assert.rejects(S.assess({...options,fetchImpl:async()=>({ok:true,json:async()=>({choices:[{finish_reason:'length',message:{content:'partial'}}]})})}),/完整/);const c=new AbortController();const pending=S.assess({...options,signal:c.signal,fetchImpl:(_,o)=>new Promise((r,j)=>o.signal.addEventListener('abort',()=>j(new Error('abort'))))});c.abort();await assert.rejects(pending,{name:'AbortError'});});
 
 test('meaning gates the overall score and unassessable audio never receives a number',()=>{assert.equal(S.parseFeedback(JSON.stringify(fixture(9,'wrong'))).score,4);assert.equal(S.parseFeedback(JSON.stringify(fixture(9,'partial'))).score,6);assert.equal(S.parseFeedback(JSON.stringify(fixture(9,'unassessable'))).score,null);for(const score of [0,11,2.5,'9'])assert.throws(()=>S.parseFeedback(JSON.stringify(fixture(score))));assert.throws(()=>S.parseFeedback(JSON.stringify({score:9,feedback:'很好'})));});
+
+test('recording waits for confirmation; failed grading exposes retry without making a request when key is missing',async()=>{
+ const vm=require('node:vm'),fs=require('node:fs');
+ const nodes=Object.fromEntries(['speaking-feedback','speaking-run','speaking-cancel','speaking-result','speaking-status','speaking-player'].map(id=>[id,{hidden:false,pause(){},load(){},removeAttribute(){}}]));
+ const ctx={document:{getElementById:id=>nodes[id]},ParoleLanguages:{get:()=>({})},URL:{createObjectURL:()=> 'blob:test',revokeObjectURL(){}},AbortController};
+ vm.createContext(ctx);vm.runInContext(fs.readFileSync(require.resolve('../dist/speaking.js'),'utf8'),ctx);
+ const mounted=ctx.ParoleSpeaking.mount({getKey:()=>'',getCard:()=>({fr:'Bonjour'})});
+ mounted.capture({});assert.equal(nodes['speaking-feedback'].hidden,true);assert.equal(nodes['speaking-run'].hidden,true);
+ await mounted.evaluate();assert.equal(nodes['speaking-feedback'].hidden,false);assert.equal(nodes['speaking-run'].hidden,false);assert.match(nodes['speaking-status'].textContent,/API Key/);
+ mounted.reset();assert.equal(nodes['speaking-feedback'].hidden,true);assert.equal(nodes['speaking-run'].hidden,true);
+});

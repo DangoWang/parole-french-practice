@@ -7,7 +7,7 @@
  const accountButton=document.createElement('button');accountButton.className='subtle';accountButton.textContent='Google 登录';document.getElementById('profile-actions').append(accountButton);
  accountButton.onclick=()=>{document.getElementById('settings-open').click();box.scrollIntoView({block:'start'});};
  const button=(text,action)=>{const b=document.createElement('button');b.type='button';b.className='secondary';b.textContent=text;b.onclick=action;box.append(b);return b;};
- const launch=()=>{const script=document.createElement('script');script.src='app.js?v=batch-key-1';document.body.append(script);};
+ const launch=()=>{const script=document.createElement('script');script.src='app.js?v=voice-confirm-1';document.body.append(script);};
  if(location.origin!==ORIGIN){status.textContent='登录 Google 账户后同步学习记录。';button('打开 Google 登录版',()=>location.assign(ORIGIN));launch();return;}
  async function request(path,options={}){const r=await fetch('/api/auth/'+path,{...options,credentials:'same-origin',cache:'no-store'});const data=await r.json();if(!r.ok)throw Error(data.error||'无法连接登录服务。');return data;}
  try{

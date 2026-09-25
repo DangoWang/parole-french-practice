@@ -30,11 +30,11 @@ function parseFeedback(text){
 }
 function mount({getKey,getCard,onScore=()=>{}}){
  const $=id=>document.getElementById(id),box=$('speaking-feedback'),run=$('speaking-run'),cancel=$('speaking-cancel'),result=$('speaking-result'),status=$('speaking-status'),player=$('speaking-player');let blob=null,url=null,card=null,generation=0,controller=null,languages=Languages.get();
- function reset(){generation++;controller?.abort();controller=null;blob=null;card=null;player.pause();player.removeAttribute('src');player.load();if(url)URL.revokeObjectURL(url);url=null;box.hidden=true;run.disabled=false;cancel.hidden=true;result.textContent='';status.textContent='';}
- function capture(recording){reset();blob=recording;card=getCard();languages=Languages.get();url=URL.createObjectURL(blob);player.src=url;box.hidden=false;status.textContent='本次录音已就绪';}
- async function evaluate(){if(!blob||!card||controller)return;const id=generation,source=blob,requestCard=card;controller=new AbortController();const signal=controller.signal;run.disabled=true;cancel.hidden=false;result.textContent='';status.textContent='正在听录音，分析口语表现…';
+ function reset(){generation++;controller?.abort();controller=null;blob=null;card=null;player.pause();player.removeAttribute('src');player.load();if(url)URL.revokeObjectURL(url);url=null;box.hidden=true;run.hidden=true;run.disabled=false;cancel.hidden=true;result.textContent='';status.textContent='';}
+ function capture(recording){reset();blob=recording;card=getCard();languages=Languages.get();url=URL.createObjectURL(blob);player.src=url;status.textContent='本次录音已就绪';}
+ async function evaluate(){if(!blob||!card||controller)return;box.hidden=false;run.hidden=true;const id=generation,source=blob,requestCard=card;controller=new AbortController();const signal=controller.signal;run.disabled=true;cancel.hidden=false;result.textContent='';status.textContent='正在听录音，分析口语表现…';
  try{const key=getKey();if(!key)throw Error('请先在学习设置中保存 API Key。');const wav=await toWav(source);if(id!==generation||signal.aborted)return;const feedback=await assess({key,wav,card:requestCard,signal,languages});if(id!==generation||getCard()!==requestCard)return;result.replaceChildren();for(const [label,content] of feedback.sections){const h=document.createElement('h4'),p=document.createElement('p');h.textContent=label;p.textContent=content;p.setAttribute('data-study-content','');p.dir='auto';result.append(h,p);}status.textContent=(feedback.score===null?'本次录音无法评分':'口语建议 '+feedback.score+' / 10')+' · '+MODEL;onScore(feedback.score);}
- catch(e){if(id===generation)status.textContent=e.name==='AbortError'?'已取消，可以重新获取反馈。':e.message;}
+ catch(e){if(id===generation){run.hidden=false;status.textContent=e.name==='AbortError'?'已取消，可以重新获取反馈。':e.message;}}
  finally{if(id===generation){controller=null;run.disabled=false;cancel.hidden=true;}}};
  run.onclick=evaluate;
  cancel.onclick=()=>{controller?.abort();status.textContent='已取消，可以重新获取反馈。';};return {reset,capture,evaluate,hasRecording:()=>!!blob};
