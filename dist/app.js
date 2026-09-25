@@ -7,18 +7,19 @@ const ACCOUNT=window.ParoleAccount,SUFFIX=ACCOUNT?'.'+ACCOUNT.id:'',KEY='parole.
 let state=Sets.initial(seed,C),current=null,revealed=false,chosen=null,mode='daily',scope='all',view='practice',extra=false,manual=false,libraryPage=0,toastTimer,storageBlocked=false;
 
 let voice,speaking,cloud,inputWasVoice=false,oralScore=null;
+const speakingPanel=$('speaking-feedback');
 const hints=window.ParoleHints.mount(document);
 const AI=window.ParoleAI;
 let aiConfig={key:'',enabled:false},aiResult=null,aiError='',aiBusy=false,aiController=null,aiGeneration=0,scoreTouched=false,testController=null;
 try{aiConfig=AI.loadConfig(localStorage);}catch{}
 function cancelAI(){aiGeneration++;aiController?.abort();aiController=null;aiBusy=false;}
-function resetAI(){inputWasVoice=false;oralScore=null;speaking?.reset();voice?.reset();cancelAI();aiResult=null;aiError='';scoreTouched=false;}
+function resetAI(){$('exercise').append(speakingPanel);inputWasVoice=false;oralScore=null;speaking?.reset();voice?.reset();cancelAI();aiResult=null;aiError='';scoreTouched=false;}
 function refreshAISettings(message){
  $('ai-key').value='';$('ai-enabled').checked=aiConfig.enabled;
  $('ai-settings-status').textContent=message||(aiConfig.key?'已保存密钥 · '+(aiConfig.enabled?'自动评分已开启':'自动评分已关闭'):'尚未设置密钥，仍可使用匹配建议和自评分。');
 }
 function renderAI(){
- const box=$('ai-feedback');if(!box)return;if(inputWasVoice){const panel=$('speaking-feedback');if(panel.nextElementSibling!==box)box.before(panel);box.hidden=!!speaking?.hasRecording();box.innerHTML=box.hidden?'':'<p>录音已释放，请自行评分，或重新录音。</p>';return;}box.hidden=false;
+ const box=$('ai-feedback');if(!box)return;if(inputWasVoice){const panel=speakingPanel;if(panel.nextElementSibling!==box)box.before(panel);box.hidden=!!speaking?.hasRecording();box.innerHTML=box.hidden?'':'<p>录音已释放，请自行评分，或重新录音。</p>';return;}box.hidden=false;
  if(aiBusy){box.innerHTML='<p role="status">正在评估意思、语法和自然度…</p><button class="text-button" id="ai-cancel">取消评分</button>';$('ai-cancel').onclick=()=>{cancelAI();aiError='已取消评分，可以自行给分。';renderAI();};return;}
  if(aiResult){
   const marked=AI.highlightParts($('answer').value,aiResult.errors).map(p=>p.error?'<mark>'+esc(p.text)+'</mark>':esc(p.text)).join('');
@@ -113,7 +114,7 @@ function revealAnswer(skip=false){if(!current||revealed)return;if(!skip&&!$('ans
 function proposed(){const prior=state.progress[current.id];if(manual&&prior&&prior.due>Date.now()&&chosen>=6)return {record:prior,early:true};return {record:C.schedule(prior,chosen),early:false};}
 function renderResult(){const m=C.match($('answer').value,current.fr);if(!inputWasVoice)chosen=chosen||m.score;const hint=m.exact?'与参考表达一致（忽略大小写和标点）。':m.accentOnly?'表达一致，请留意重音符号。':'仅比较文字匹配度，不判断同义表达是否正确。你可以调整评分。';const diff=m.exact?'':`<details class="note"><summary>查看参考表达中的差异</summary><div class="diff" lang="fr">${diffMarkup($('answer').value,current.fr)}</div><p>高亮的是未匹配的参考词语，不代表你的替代表达一定有错。</p></details>`;
 // Preserve the mounted audio player and feedback when the score rerenders.
-$('exercise').append($('speaking-feedback'));
+$('exercise').append(speakingPanel);
 $('result').innerHTML=`<div class="result-label">参考表达</div><div class="reference"><p lang="fr">${esc(current.fr)}</p></div><p class="note" data-study-content>${esc(current.note)}</p>${inputWasVoice?'':`<div class="match-row"><span class="match-score">匹配建议 ${m.score} / 10</span><span class="match-hint">${hint}</span></div>${diff}`}<section id="ai-feedback" class="ai-feedback"></section><div class="score-title">${inputWasVoice?'你的最终评分（可自行修改 AI 建议）':'这次，你觉得自己掌握了几分？'}</div><div class="score-buttons" role="group" aria-label="自评分 1 至 10">${Array.from({length:10},(_,i)=>`<button class="score-button${chosen===i+1?' chosen':''}" data-score="${i+1}" aria-pressed="${chosen===i+1}">${i+1}</button>`).join('')}</div><div class="score-key"><span>1–3 想不起来</span><span>4–6 还不熟练</span><span>7–9 基本掌握</span><span>10 完美</span></div><p class="next-preview" id="next-preview"></p><div class="save-row"><span class="muted">以你的最终评分安排复习</span><button class="primary" id="save-score" ${chosen?'':'disabled'}>保存评分，下一条 →</button></div>`;
 $('result').querySelectorAll('[data-score]').forEach(btn=>btn.addEventListener('click',()=>{scoreTouched=true;chosen=Number(btn.dataset.score);$('save-score').disabled=false;$('result').querySelectorAll('[data-score]').forEach(b=>{b.classList.toggle('chosen',Number(b.dataset.score)===chosen);b.setAttribute('aria-pressed',String(Number(b.dataset.score)===chosen));});updatePreview();persistDraft();renderAI();}));$('save-score').addEventListener('click',saveScore);updatePreview();renderAI();}
 function updatePreview(){if(!chosen){$('next-preview').textContent='等待口语建议分数，也可以先自行评分。';return;}const p=proposed();$('next-preview').textContent=p.early?`这是提前练习，保持原计划：${when(p.record.due)}复习。`:`下次安排：${nextCopy(p.record)}。`;}
