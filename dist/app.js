@@ -1,7 +1,7 @@
 (()=>{'use strict';
 window.PAROLE_SITE_URL="https://parole-french-practice-8chh.vercel.app";
 const C=window.ParoleCore,Sets=window.ParoleCollections,seed=window.PAROLE_DECK;
-let deck=[],ids=new Set(),byId={},groupNames=[];let libraryUI;
+let deck=[],ids=new Set(),byId={},groupNames=[];let libraryUI,bubbleUI;
 const ACCOUNT=window.ParoleAccount,SUFFIX=ACCOUNT?'.'+ACCOUNT.id:'',KEY='parole.study.v2'+SUFFIX,LEGACY_KEY=ACCOUNT?KEY:'parole.study.v1', $=id=>document.getElementById(id), esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 let state=Sets.initial(seed,C),current=null,revealed=false,chosen=null,mode='daily',scope='all',view='practice',extra=false,manual=false,libraryPage=0,toastTimer,storageBlocked=false;
@@ -63,7 +63,7 @@ window.addEventListener('pagehide',()=>{voice.reset();speaking.reset();});
 
 function warning(message){$('storage-warning').hidden=false;$('storage-warning').textContent=message;}
 try{const raw=localStorage.getItem(KEY)||localStorage.getItem(LEGACY_KEY);if(raw)state=Sets.validate(JSON.parse(raw),seed,C);}catch(e){storageBlocked=true;warning('暂时无法读取学习记录，原数据不会被覆盖。你仍可练习并导出本次备份；请检查浏览器存储设置，或导入有效备份。');}
-function persist(){window.ParoleLanguages.set(state.settings);if(storageBlocked)return false;try{localStorage.setItem(KEY,JSON.stringify(state));cloud?.changed();return true;}catch{warning('浏览器未能保存进度。本次页面中的记录仍在，请在「学习设置与备份」中导出备份。');return false;}}
+function persist(){window.ParoleLanguages.set(state.settings);if(storageBlocked)return false;try{localStorage.setItem(KEY,JSON.stringify(state));cloud?.changed();bubbleUI?.refresh();return true;}catch{warning('浏览器未能保存进度。本次页面中的记录仍在，请在「学习设置与备份」中导出备份。');return false;}}
 function toast(message){clearTimeout(toastTimer);$('toast').textContent=message;$('toast').hidden=false;toastTimer=setTimeout(()=>$('toast').hidden=true,4200);}
 function when(timestamp){if(timestamp<=Date.now())return '现在到期';const minutes=Math.ceil((timestamp-Date.now())/60000);if(minutes<=60)return `${minutes} 分钟后`;if(C.dayKey(timestamp)===C.dayKey(C.dayAfter(1)))return '明天';return new Intl.DateTimeFormat((window.ParoleUI?.locale()||'en-US'),{month:'short',day:'numeric'}).format(timestamp);}
 function nextCopy(p){return p.stage==='learning'&&p.interval===0?'10 分钟后复习':`${when(p.due)}复习${p.interval>1?` · 间隔 ${p.interval} 天`:''}`;}
@@ -150,7 +150,7 @@ cloud=window.ParoleSync.create({account:ACCOUNT,requireAccount:true,storage:{get
  const incoming=Sets.validate(raw,seed,C);
  // Save a recovery copy before replacing local data. Failure aborts the pull.
  localStorage.setItem('parole.before-cloud.v1'+SUFFIX,JSON.stringify(state));
- localStorage.setItem(KEY,JSON.stringify(incoming));state=incoming;resetAI();current=null;rebuildCatalog();chooseNext();if(view==='library')libraryUI.refresh();if(view==='plan')renderPlan();
+ localStorage.setItem(KEY,JSON.stringify(incoming));state=incoming;bubbleUI?.refresh();resetAI();current=null;rebuildCatalog();chooseNext();if(view==='library')libraryUI.refresh();if(view==='plan')renderPlan();
 },onStatus:(message,connected)=>{$('sync-status').textContent=message;document.querySelector('.local-badge').textContent=message;$('sync-now').disabled=!connected;},onConflict:conflict=>{
  $('sync-conflict').hidden=!conflict;
  if(conflict)$('sync-conflict-summary').textContent=`本机 ${conflict.local.history.length} 次练习；云端 ${conflict.remote?.history.length||0} 次练习。选择一份作为当前记录，另一份先保存为备份。`;
@@ -165,6 +165,7 @@ $('sync-recovery').onclick=()=>{const backup=localStorage.getItem('parole.before
 window.addEventListener('online',()=>cloud.sync());
 window.addEventListener('storage',e=>{if(e.key===window.ParoleSync.CONFIG){location.reload();}else if(e.key===KEY)cloud.changed();});
 setInterval(()=>{if(!document.hidden)cloud.sync();},60000);
+bubbleUI=window.ParoleBubbleUI.mount({getState:()=>state,save:persist,suffix:SUFFIX});
 cloud.sync();
 setInterval(()=>{updateStats();if(view==='practice'&&!current)chooseNext();if(view==='plan')renderPlan();checkReminder();},30000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){updateStats();checkReminder();}});

@@ -115,3 +115,11 @@ node --test tests/core.test.cjs tests/ai.test.cjs tests/collections.test.cjs
 ## 示例与个人句集
 
 仓库仅内置 **TCF Écrite Tâche1** 的 350 条示例表达。其他句集由用户在应用内创建或导入，通过云同步保存在 MongoDB，并保留浏览器本地副本。仓库不再打包口语资料、下载文件或自动导入入口。升级不会删除已有句集、笔记或历史；新设备请先连接云同步，再选择使用完整的云端记录。
+
+## Quick bubble reviews
+
+Use the bottom-right notes icon to add any text and an optional meaning/hint. Manage notes with search, edit, pause/resume and recoverable deletion. Enable or disable bubbles under learning settings; the preference is per device/account, enabled by default on a desktop-sized fine-pointer device and off on mobile. Notes and schedules are included in account sync and backup; they do not affect daily sentence targets.
+
+The focused, visible Parole page offers at most one due note every five minutes. It waits during recording or dialogs, never stacks unanswered prompts, and does not send OS notifications or run after the page closes. Click the content to reveal its hint and rate it. “Later” postpones it by five minutes without a rating.
+
+This is a deliberately simple high-frequency scheduler inspired by [Anki's learning/relearning steps](https://docs.ankiweb.net/studying.html), not an FSRS implementation. Unknown resets to 5 minutes; Unsure to 10 minutes; Known uses at least 30 minutes and doubles the preceding interval; Too easy uses at least one day and quadruples the preceding interval. Intervals cap at seven days. Only due active notes enter the queue, ordered by oldest due time (then least recently displayed); this prevents newer difficult notes from indefinitely overtaking an older backlog. If nothing is due, no reminder is shown. There is no AI call for this feature.
